@@ -45,7 +45,6 @@ class ToutiaoScraper(BaseScraper):
                 }
             )
             
-            # 创建一个模拟的热搜数据，确保前端能够显示内容
             trending_items = []
             
             # 使用正则表达式直接从HTML中提取热搜项
@@ -169,43 +168,108 @@ class ToutiaoScraper(BaseScraper):
                             )
                         )
             
-            # 如果仍然没有数据，创建一些模拟数据以便前端能够显示
+            # 如果仍然没有找到数据，尝试使用另一个URL
             if not trending_items:
-                logger.warning("Could not extract real data, creating mock data")
-                # 创建一些模拟数据
-                mock_data = [
-                    ("中国经济增长超预期", "经济数据显示中国GDP增长超出市场预期", "https://www.toutiao.com/search/?keyword=中国经济增长超预期"),
-                    ("新能源汽车销量创新高", "多家车企报告新能源汽车销量大幅增长", "https://www.toutiao.com/search/?keyword=新能源汽车销量创新高"),
-                    ("教育部发布新政策", "关于进一步减轻学生负担的新政策出台", "https://www.toutiao.com/search/?keyword=教育部发布新政策"),
-                    ("科技创新引领发展", "多项重大科技突破推动产业升级", "https://www.toutiao.com/search/?keyword=科技创新引领发展"),
-                    ("健康生活新趋势", "年轻人更注重健康生活方式", "https://www.toutiao.com/search/?keyword=健康生活新趋势"),
-                    ("文化产业蓬勃发展", "传统文化与现代科技融合催生新业态", "https://www.toutiao.com/search/?keyword=文化产业蓬勃发展"),
-                    ("环保行动全面推进", "多地启动环境保护专项行动", "https://www.toutiao.com/search/?keyword=环保行动全面推进"),
-                    ("国际合作新进展", "中国与多国签署合作协议", "https://www.toutiao.com/search/?keyword=国际合作新进展"),
-                    ("体育赛事精彩纷呈", "多项国际赛事在中国举行", "https://www.toutiao.com/search/?keyword=体育赛事精彩纷呈"),
-                    ("旅游市场复苏强劲", "假日旅游数据显示市场活力回升", "https://www.toutiao.com/search/?keyword=旅游市场复苏强劲")
+                logger.info("Trying alternative URL")
+                # 尝试另一个URL
+                alt_response_text = await fetch_async(
+                    "https://www.toutiao.com/hot-event/hot-board/?origin=toutiao_pc",
+                    headers={
+                        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+                        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+                        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+                        "Accept-Encoding": "gzip, deflate, br",
+                        "Connection": "keep-alive",
+                        "Referer": "https://www.toutiao.com/",
+                        "Upgrade-Insecure-Requests": "1"
+                    }
+                )
+                
+                # 尝试从JSON中提取数据
+                json_patterns = [
+                    r'<script>window\._SSR_HYDRATED_DATA=(.*?)</script>',
+                    r'<script id="RENDER_DATA" type="application/json">(.*?)</script>',
+                    r'window\._SSR_HYDRATED_DATA\s*=\s*({.*?});\s*</script>',
+                    r'__NEXT_DATA__\s*=\s*({.*?});\s*</script>',
+                    r'<script>window\.__INITIAL_STATE__\s*=\s*({.*?});</script>'
                 ]
                 
-                for rank, (title, desc, url) in enumerate(mock_data, 1):
-                    trending_items.append(
-                        TrendingItem(
-                            title=title,
-                            url=url,
-                            rank=rank,
-                            score=float(100 - rank * 5),  # 模拟热度值
-                            author=None,
-                            description=desc,
-                            timestamp=datetime.now(),
-                            platform=self.name,
-                            category="hot_search",
-                            extra_data={
-                                "label": "热",
-                                "image_url": "",
-                                "hot_value_display": f"{100 - rank * 5}",
-                                "tag": "热门"
-                            }
-                        )
-                    )
+                for pattern in json_patterns:
+                    json_match = re.search(pattern, alt_response_text, re.DOTALL)
+                    if json_match:
+                        json_str = json_match.group(1).replace('undefined', 'null')
+                        try:
+                            if pattern.find('RENDER_DATA') > -1 or pattern.find('__NEXT_DATA__') > -1:
+                                import urllib.parse
+                                json_str = urllib.parse.unquote(json_str)
+                            data = json.loads(json_str)
+                            logger.info(f"Successfully extracted JSON data using pattern: {pattern[:20]}...")
+                            
+                            # 尝试从JSON中提取热搜数据
+                            hot_board_data = self._extract_hot_board_data(data)
+                            
+                            if hot_board_data:
+                                for rank, item in enumerate(hot_board_data[:20], 1):
+                                    if not isinstance(item, dict):
+                                        continue
+                                        
+                                    # 尝试多种可能的字段名
+                                    title = item.get("Title", "") or item.get("title", "") or item.get("content", "")
+                                    url = item.get("url", "") or item.get("link", "") or item.get("share_url", "")
+                                    
+                                    if not url:
+                                        url = f"https://www.toutiao.com/search/?keyword={title}"
+                                    elif not url.startswith("http"):
+                                        url = f"https://www.toutiao.com{url}"
+                                        
+                                    hot_value = item.get("HotValue", 0) or item.get("hot_value", 0) or item.get("score", 0) or item.get("raw_hot_value", 0)
+                                    description = item.get("Abstract", "") or item.get("abstract", "") or item.get("description", "") or item.get("desc", "")
+                                    
+                                    # 创建额外数据字典
+                                    extra_data = {
+                                        "label": "",
+                                        "image_url": "",
+                                        "hot_value_display": "",
+                                        "tag": ""
+                                    }
+                                    
+                                    # 安全地获取额外数据
+                                    extra_data["label"] = item.get("Label", "") or item.get("label", "") or item.get("tag", "")
+                                    
+                                    # 安全地获取图片URL
+                                    image = item.get("Image") or item.get("image")
+                                    if isinstance(image, dict):
+                                        extra_data["image_url"] = image.get("url", "") or image.get("src", "")
+                                    else:
+                                        extra_data["image_url"] = item.get("image_url", "") or item.get("img", "")
+                                    
+                                    extra_data["hot_value_display"] = item.get("HotValueFormat", "") or item.get("hot_value_format", "") or item.get("display_hot_value", "")
+                                    extra_data["tag"] = item.get("LabelDesc", "") or item.get("label_desc", "") or item.get("category", "")
+                                    
+                                    # 创建趋势项
+                                    trending_items.append(
+                                        TrendingItem(
+                                            title=title,
+                                            url=url,
+                                            rank=rank,
+                                            score=float(hot_value) if hot_value and isinstance(hot_value, (int, float, str)) and str(hot_value).replace('.', '', 1).isdigit() else None,
+                                            author=None,
+                                            description=description,
+                                            timestamp=datetime.now(),
+                                            platform=self.name,
+                                            category="hot_search",
+                                            extra_data=extra_data
+                                        )
+                                    )
+                                break
+                        except json.JSONDecodeError as e:
+                            logger.warning(f"JSON decode error with pattern {pattern[:20]}...: {e}")
+                            continue
+            
+            # 如果仍然没有数据，记录错误
+            if not trending_items:
+                logger.error("Could not extract trending data from Toutiao")
+                return []
             
             logger.info(f"Successfully extracted {len(trending_items)} trending items")
             return trending_items
@@ -214,37 +278,79 @@ class ToutiaoScraper(BaseScraper):
             logger.error(f"Error fetching trending content from {self.display_name}: {e}")
             import traceback
             logger.error(traceback.format_exc())
+            return []
+    
+    def _extract_hot_board_data(self, data):
+        """从JSON数据中提取热搜数据。
+        
+        Args:
+            data: JSON数据
             
-            # 出错时返回模拟数据，确保前端能够显示内容
-            mock_data = [
-                ("中国经济增长超预期", "经济数据显示中国GDP增长超出市场预期", "https://www.toutiao.com/search/?keyword=中国经济增长超预期"),
-                ("新能源汽车销量创新高", "多家车企报告新能源汽车销量大幅增长", "https://www.toutiao.com/search/?keyword=新能源汽车销量创新高"),
-                ("教育部发布新政策", "关于进一步减轻学生负担的新政策出台", "https://www.toutiao.com/search/?keyword=教育部发布新政策"),
-                ("科技创新引领发展", "多项重大科技突破推动产业升级", "https://www.toutiao.com/search/?keyword=科技创新引领发展"),
-                ("健康生活新趋势", "年轻人更注重健康生活方式", "https://www.toutiao.com/search/?keyword=健康生活新趋势")
-            ]
+        Returns:
+            热搜数据列表，如果未找到则返回空列表
+        """
+        if not data or not isinstance(data, dict):
+            return []
             
-            trending_items = []
-            for rank, (title, desc, url) in enumerate(mock_data, 1):
-                trending_items.append(
-                    TrendingItem(
-                        title=title,
-                        url=url,
-                        rank=rank,
-                        score=float(100 - rank * 5),  # 模拟热度值
-                        author=None,
-                        description=desc,
-                        timestamp=datetime.now(),
-                        platform=self.name,
-                        category="hot_search",
-                        extra_data={
-                            "label": "热",
-                            "image_url": "",
-                            "hot_value_display": f"{100 - rank * 5}",
-                            "tag": "热门"
-                        }
-                    )
-                )
+        # 尝试多种可能的数据路径
+        possible_paths = [
+            ["ChineseHotBoard", "hotBoard", "data"],
+            ["data", "ChineseHotBoard", "hotBoard", "data"],
+            ["props", "pageProps", "hotBoard", "data"],
+            ["props", "pageProps", "data", "hotBoard"],
+            ["props", "initialState", "hotBoard", "data"],
+            ["initialState", "hotBoard", "data"]
+        ]
+        
+        for path in possible_paths:
+            current = data
+            valid_path = True
             
-            logger.info(f"Returning {len(trending_items)} mock trending items due to error")
-            return trending_items
+            for key in path:
+                if not isinstance(current, dict) or key not in current:
+                    valid_path = False
+                    break
+                current = current[key]
+            
+            if valid_path and isinstance(current, list) and current:
+                logger.info(f"Found hot board data using path: {path}")
+                return current
+        
+        # 递归查找可能包含热搜数据的列表
+        def find_hot_board_data(obj, depth=0, max_depth=3):
+            if depth >= max_depth:
+                return None
+            
+            if isinstance(obj, list) and len(obj) > 0 and isinstance(obj[0], dict):
+                # 检查是否是热搜数据列表
+                keys_to_check = ["title", "url", "hot_value", "image"]
+                first_item = obj[0]
+                
+                # 检查是否至少有2个关键字段
+                matches = sum(1 for key in keys_to_check if key in first_item or key.capitalize() in first_item)
+                if matches >= 2:
+                    return obj
+            
+            if isinstance(obj, dict):
+                for key, value in obj.items():
+                    # 优先检查可能包含热搜数据的键
+                    if key.lower().find("hot") >= 0 or key.lower().find("board") >= 0 or key.lower().find("list") >= 0:
+                        result = find_hot_board_data(value, depth + 1, max_depth)
+                        if result:
+                            return result
+                    
+                # 检查所有其他键
+                for key, value in obj.items():
+                    if key.lower().find("hot") < 0 and key.lower().find("board") < 0 and key.lower().find("list") < 0:
+                        result = find_hot_board_data(value, depth + 1, max_depth)
+                        if result:
+                            return result
+            
+            return None
+        
+        hot_board_data = find_hot_board_data(data)
+        if hot_board_data:
+            logger.info(f"Found hot board data using recursive search, items: {len(hot_board_data)}")
+            return hot_board_data
+            
+        return []
