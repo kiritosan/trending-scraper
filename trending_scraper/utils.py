@@ -31,26 +31,43 @@ class TrendingItem(BaseModel):
     extra_data: Dict[str, Any] = {}
 
 
-async def fetch_async(url: str, headers: Optional[Dict[str, str]] = None) -> str:
-    """Fetch content from URL asynchronously.
+async def fetch_async(url: str, headers: Optional[Dict[str, str]] = None, timeout: int = 30) -> str:
+    """Fetch URL asynchronously.
     
     Args:
-        url: The URL to fetch content from
-        headers: Optional HTTP headers
+        url: URL to fetch
+        headers: Optional headers
+        timeout: Request timeout in seconds
         
     Returns:
-        The response text
+        Response text
     """
-    if headers is None:
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-            "(KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36"
-        }
+    default_headers = {
+        "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Cache-Control": "max-age=0",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Pragma": "no-cache"
+    }
     
-    async with aiohttp.ClientSession() as session:
-        async with session.get(url, headers=headers) as response:
-            response.raise_for_status()
-            return await response.text()
+    if headers:
+        default_headers.update(headers)
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, headers=default_headers, timeout=timeout) as response:
+                response.raise_for_status()
+                return await response.text()
+    except Exception as e:
+        logger.error(f"Error fetching URL {url}: {e}")
+        raise
 
 
 def fetch_sync(url: str, headers: Optional[Dict[str, str]] = None) -> str:
