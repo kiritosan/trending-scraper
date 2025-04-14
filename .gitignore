@@ -122,3 +122,6 @@ dmypy.json
 
 # uv
 .uv/
+
+# 允许frontend目录
+!frontend/

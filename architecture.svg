@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <style>
+        .component {
+            fill: #f0f8ff;
+            stroke: #4682b4;
+            stroke-width: 2;
+            rx: 10;
+            ry: 10;
+        }
+        .module {
+            fill: #e6f3ff;
+            stroke: #6495ed;
+            stroke-width: 1.5;
+            rx: 5;
+            ry: 5;
+        }
+        .arrow {
+            stroke: #708090;
+            stroke-width: 1.5;
+            fill: none;
+            marker-end: url(#arrowhead);
+        }
+        .label {
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            text-anchor: middle;
+            fill: #333;
+        }
+        .module-label {
+            font-family: Arial, sans-serif;
+            font-size: 12px;
+            text-anchor: middle;
+            fill: #333;
+        }
+        .title {
+            font-family: Arial, sans-serif;
+            font-size: 24px;
+            font-weight: bold;
+            text-anchor: middle;
+            fill: #333;
+        }
+    </style>
+    
+    <defs>
+        <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+            <polygon points="0 0, 10 3.5, 0 7" fill="#708090" />
+        </marker>
+    </defs>
+    
+    <text x="400" y="40" class="title">Trending Scraper 架构图</text>
+    
+    <!-- CLI 组件 -->
+    <rect x="300" y="70" width="200" height="60" class="component" />
+    <text x="400" y="105" class="label">CLI (cli.py)</text>
+    
+    <!-- 爬虫基类 -->
+    <rect x="300" y="180" width="200" height="60" class="component" />
+    <text x="400" y="215" class="label">爬虫基类 (scrapers/__init__.py)</text>
+    
+    <!-- 具体爬虫实现 -->
+    <rect x="150" y="290" width="150" height="60" class="component" />
+    <text x="225" y="325" class="label">Bilibili爬虫</text>
+    
+    <rect x="350" y="290" width="150" height="60" class="component" />
+    <text x="425" y="325" class="label">今日头条爬虫</text>
+    
+    <rect x="550" y="290" width="150" height="60" class="component" />
+    <text x="625" y="325" class="label">其他爬虫（可扩展）</text>
+    
+    <!-- 工具模块 -->
+    <rect x="300" y="400" width="200" height="60" class="component" />
+    <text x="400" y="435" class="label">工具模块 (utils.py)</text>
+    
+    <!-- 数据模型 -->
+    <rect x="100" y="470" width="120" height="40" class="module" />
+    <text x="160" y="495" class="module-label">TrendingItem</text>
+    
+    <!-- 网络请求 -->
+    <rect x="250" y="470" width="120" height="40" class="module" />
+    <text x="310" y="495" class="module-label">fetch_async</text>
+    
+    <rect x="400" y="470" width="120" height="40" class="module" />
+    <text x="460" y="495" class="module-label">fetch_sync</text>
+    
+    <!-- 日志 -->
+    <rect x="550" y="470" width="120" height="40" class="module" />
+    <text x="610" y="495" class="module-label">logger</text>
+    
+    <!-- 连接线 -->
+    <!-- CLI 到爬虫基类 -->
+    <path d="M 400 130 L 400 180" class="arrow" />
+    
+    <!-- 爬虫基类到具体爬虫 -->
+    <path d="M 350 240 L 225 290" class="arrow" />
+    <path d="M 400 240 L 425 290" class="arrow" />
+    <path d="M 450 240 L 625 290" class="arrow" />
+    
+    <!-- 具体爬虫到工具模块 -->
+    <path d="M 225 350 L 350 400" class="arrow" />
+    <path d="M 425 350 L 400 400" class="arrow" />
+    <path d="M 625 350 L 450 400" class="arrow" />
+    
+    <!-- 工具模块到子模块 -->
+    <path d="M 340 460 L 160 470" class="arrow" />
+    <path d="M 370 460 L 310 470" class="arrow" />
+    <path d="M 430 460 L 460 470" class="arrow" />
+    <path d="M 460 460 L 610 470" class="arrow" />
+    
+    <!-- 外部依赖 -->
+    <rect x="50" y="540" width="700" height="40" class="component" style="fill: #f5f5f5;" />
+    <text x="400" y="565" class="label">外部依赖: aiohttp, requests, click, rich, bs4, pydantic</text>
+</svg>
