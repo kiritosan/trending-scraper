@@ -47,5 +47,6 @@ class BaseScraper(abc.ABC):
 # Import all scrapers to register them
 from .bilibili import BilibiliScraper
 from .toutiao import ToutiaoScraper
+from .woshipm import WoShiPmScraper
 
-__all__ = ["BaseScraper", "BilibiliScraper", "ToutiaoScraper"]
+__all__ = ["BaseScraper", "BilibiliScraper", "ToutiaoScraper", "WoShiPmScraper"]
